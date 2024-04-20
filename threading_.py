@@ -5,20 +5,27 @@ from timeit import default_timer as timer
 lock = threading.Lock()
 
 # Функція, яка виконує пошук в файлах
-def thread_worker(file_paths, results):
-    local_found = []  # Локальний список знайдених файлів
+def thread_worker(file_paths, target_strings, results):
+    local_found = {key: [] for key in target_strings}  # Локальний список знайдених файлів
     for file_path in file_paths:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            if "Data Science GoIT" in file.read():
-                local_found.append(file_path)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+                for key in target_strings:
+                    if key in content:
+                        local_found[key].append(file_path)
+        except Exception as e:
+            print(f"Failed to read {file_path}: {e}")
+            
     with lock:
-        results.extend(local_found)
+        for key in local_found:
+            results[key].extend(local_found[key])
 
 # Функція для багатопотокового пошуку
-def multi_threaded_search():
+def multi_threaded_search(target_strings):
     start = timer()
     threads = []
-    results = []
+    results = {key: [] for key in target_strings}
     file_paths = [f'data/file_{i}.txt' for i in range(1, 6)]
     n_threads = 2
     files_per_thread = (len(file_paths) + n_threads - 1) // n_threads
@@ -27,7 +34,7 @@ def multi_threaded_search():
         start_idx = i * files_per_thread
         end_idx = min((i + 1) * files_per_thread, len(file_paths))
         t_file_paths = file_paths[start_idx:end_idx]
-        thread = threading.Thread(target=thread_worker, args=(t_file_paths, results))
+        thread = threading.Thread(target=thread_worker, args=(t_file_paths, target_strings, results))
         threads.append(thread)
         thread.start()
 
@@ -36,6 +43,8 @@ def multi_threaded_search():
     end = timer()
     return results, end - start
 
-results, time_taken = multi_threaded_search()
-print("Threads Results:", results)
-print("Time Taken:", time_taken)
+if __name__ == '__main__':
+    target_strings = ["Data Science GoIT", "GoIT_2", "GoIT_3"]
+    results, time_taken = multi_threaded_search(target_strings)
+    print("Threads Results:", results)
+    print("Time Taken:", time_taken)
